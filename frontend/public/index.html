@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=800, initial-scale=1.0">
+  <title>Dashboard</title>
+  <style>
+    /* ── Reset & base ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #ffffff;
+      --fg:       #000000;
+      --muted:    #555555;
+      --border:   #000000;
+      --dot-on:   #000000;
+      --dot-off:  #aaaaaa;
+      --dot-err:  #000000;
+      --font-ui:  'Courier New', Courier, monospace;
+      --font-data: Georgia, 'Times New Roman', serif;
+    }
+
+    html, body {
+      width: 800px;
+      height: 600px;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-ui);
+    }
+
+    /* ── Layout principal ────────────────────────────────────────── */
+    #app {
+      width: 800px;
+      height: 600px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Topo: 3 blocos ──────────────────────────────────────────── */
+    #top {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      border-bottom: 2px solid var(--border);
+      height: 160px;
+    }
+
+    .top-block {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .top-block + .top-block {
+      border-left: 1px solid var(--border);
+    }
+
+    .block-label {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: lowercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+
+    /* Bloco 1 – Clima externo */
+    #weather-temp {
+      font-family: var(--font-data);
+      font-size: 42px;
+      line-height: 1;
+      font-weight: normal;
+    }
+    #weather-temp sup { font-size: 18px; vertical-align: super; }
+    #weather-desc { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    #weather-meta { font-size: 10px; color: var(--muted); }
+
+    /* Bloco 2 – Clima interno */
+    #home-temp {
+      font-family: var(--font-data);
+      font-size: 42px;
+      line-height: 1;
+      font-weight: normal;
+    }
+    #home-temp sup { font-size: 18px; vertical-align: super; }
+    #home-humid { font-size: 10px; color: var(--muted); margin-top: 4px; }
+    #home-unavail { font-size: 11px; color: var(--muted); font-style: italic; }
+
+    /* Bloco 3 – Horário */
+    #clock-time {
+      font-family: var(--font-data);
+      font-size: 46px;
+      line-height: 1;
+      font-weight: normal;
+      letter-spacing: -1px;
+    }
+    #clock-date { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    #clock-week { font-size: 10px; color: var(--muted); }
+
+    /* ── Meio: containers ────────────────────────────────────────── */
+    #middle {
+      flex: 1;
+      padding: 10px 14px 6px;
+      overflow: hidden;
+      border-bottom: 2px solid var(--border);
+    }
+
+    #middle-label {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+
+    #container-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px 10px;
+    }
+
+    .container-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: inline-block;
+    }
+    .status-dot.running  { background: var(--dot-on); }
+    .status-dot.stopped  { background: transparent; border: 1.5px solid var(--dot-off); }
+    .status-dot.error    { background: transparent; border: 2px solid var(--dot-err); position: relative; }
+
+    .status-warn { font-size: 12px; flex-shrink: 0; }
+
+    .container-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--fg);
+    }
+    .container-name.stopped { color: var(--muted); }
+    .container-name.error   { color: var(--fg); }
+
+    /* ── Rodapé: carrossel de notícias ───────────────────────────── */
+    #footer {
+      height: 56px;
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      position: relative;
+    }
+
+    #news-label {
+      font-size: 9px;
+      color: var(--muted);
+      white-space: nowrap;
+      margin-right: 10px;
+      flex-shrink: 0;
+      padding-right: 10px;
+      border-right: 1px solid var(--border);
+    }
+
+    #news-ticker {
+      overflow: hidden;
+      flex: 1;
+    }
+
+    #news-track {
+      display: flex;
+      gap: 0;
+      transition: transform 0.6s ease;
+    }
+
+    .news-item {
+      min-width: 100%;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--fg);
+    }
+
+    .news-item-num {
+      font-size: 9px;
+      color: var(--muted);
+      margin-right: 5px;
+    }
+
+    /* ── Modo galeria (fora do horário) ──────────────────────────── */
+    #gallery-mode {
+      display: none;
+      width: 800px;
+      height: 600px;
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    #gallery-mode.active { display: flex; }
+
+    #gallery-img {
+      max-width: 780px;
+      max-height: 560px;
+      object-fit: contain;
+      filter: grayscale(100%) contrast(1.1);
+    }
+
+    #gallery-time {
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Estado de carregamento ──────────────────────────────────── */
+    .loading { color: var(--muted); font-style: italic; font-size: 11px; }
+    .error-msg { color: var(--fg); font-size: 10px; }
+  </style>
+</head>
+<body>
+
+<!-- ── DASHBOARD ──────────────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- TOPO -->
+  <div id="top">
+
+    <!-- Bloco 1: Clima externo -->
+    <div class="top-block">
+      <div class="block-label">clima externo</div>
+      <div>
+        <div id="weather-temp" class="loading">--</div>
+        <div id="weather-desc"></div>
+      </div>
+      <div id="weather-meta"></div>
+    </div>
+
+    <!-- Bloco 2: Clima interno -->
+    <div class="top-block">
+      <div class="block-label">clima da casa</div>
+      <div>
+        <div id="home-temp" class="loading">--</div>
+        <div id="home-humid"></div>
+        <div id="home-unavail"></div>
+      </div>
+    </div>
+
+    <!-- Bloco 3: Horário -->
+    <div class="top-block">
+      <div class="block-label">horário</div>
+      <div>
+        <div id="clock-time">--:--</div>
+        <div id="clock-date"></div>
+        <div id="clock-week"></div>
+      </div>
+    </div>
+
+  </div><!-- /top -->
+
+  <!-- MEIO: Containers -->
+  <div id="middle">
+    <div id="middle-label">containers docker</div>
+    <div id="container-grid">
+      <div class="container-row"><span class="loading">carregando...</span></div>
+    </div>
+  </div>
+
+  <!-- RODAPÉ: Notícias -->
+  <div id="footer">
+    <div id="news-label">notícias</div>
+    <div id="news-ticker">
+      <div id="news-track">
+        <div class="news-item loading">carregando...</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ── MODO GALERIA ────────────────────────────────────────────────────────── -->
+<div id="gallery-mode">
+  <img id="gallery-img" src="" alt="">
+  <div id="gallery-time"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Configurações ────────────────────────────────────────────────
+  const UPDATE_INTERVAL_MS = 5 * 60 * 1000;   // 5 minutos
+  const CLOCK_INTERVAL_MS  = 1000;
+  const NEWS_INTERVAL_MS   = 8000;             // troca de notícia a cada 8s
+  const GALLERY_INTERVAL_MS = 30000;           // troca de imagem a cada 30s
+  const BUSINESS_START     = 8;
+  const BUSINESS_END       = 17;
+
+  const DAYS_PT   = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  const MONTHS_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+  // ── Estado ───────────────────────────────────────────────────────
+  let newsItems    = [];
+  let newsIndex    = 0;
+  let galleryUrls  = [];
+  let galleryIndex = 0;
+
+  // ── Utilidades ───────────────────────────────────────────────────
+  function isBusinessHours(date) {
+    const h = date.getHours();
+    return h >= BUSINESS_START && h < BUSINESS_END;
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  // ── Relógio ──────────────────────────────────────────────────────
+  function tickClock() {
+    const now = new Date();
+    const h = pad2(now.getHours());
+    const m = pad2(now.getMinutes());
+
+    document.getElementById('clock-time').textContent = `${h}:${m}`;
+
+    const day   = DAYS_PT[now.getDay()];
+    const date  = now.getDate();
+    const month = MONTHS_PT[now.getMonth()];
+    const year  = now.getFullYear();
+
+    document.getElementById('clock-date').textContent = `${date} ${month} ${year}`;
+    document.getElementById('clock-week').textContent  = day;
+
+    document.getElementById('gallery-time').textContent =
+      `${h}:${pad2(now.getMinutes())} — fora do horário`;
+  }
+
+  setInterval(tickClock, CLOCK_INTERVAL_MS);
+  tickClock();
+
+  // ── Clima externo ────────────────────────────────────────────────
+  async function fetchWeather() {
+    try {
+      const r    = await fetch('/api/weather');
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+
+      document.getElementById('weather-temp').innerHTML =
+        `${data.temp}<sup>°C</sup>`;
+      document.getElementById('weather-temp').classList.remove('loading');
+      document.getElementById('weather-desc').textContent = data.description;
+      document.getElementById('weather-meta').textContent =
+        `umidade ${data.humidity}% · sensação ${data.feels_like}°C · ${data.city}`;
+    } catch (e) {
+      document.getElementById('weather-temp').innerHTML = '--';
+      document.getElementById('weather-desc').textContent = 'sem dados';
+    }
+  }
+
+  // ── Clima interno ────────────────────────────────────────────────
+  async function fetchHomeClimate() {
+    const tempEl  = document.getElementById('home-temp');
+    const humEl   = document.getElementById('home-humid');
+    const unavEl  = document.getElementById('home-unavail');
+    try {
+      const r    = await fetch('/api/home-climate');
+      const data = await r.json();
+
+      if (!data.available) {
+        tempEl.innerHTML = '--';
+        unavEl.textContent = 'sensor não configurado';
+        return;
+      }
+      tempEl.innerHTML = `${Math.round(data.temperature)}<sup>°C</sup>`;
+      tempEl.classList.remove('loading');
+      humEl.textContent  = `umidade ${data.humidity}%`;
+      unavEl.textContent = '';
+    } catch (e) {
+      tempEl.innerHTML   = '--';
+      unavEl.textContent = 'sem dados';
+    }
+  }
+
+  // ── Containers ───────────────────────────────────────────────────
+  async function fetchContainers() {
+    const grid = document.getElementById('container-grid');
+    try {
+      const r    = await fetch('/api/containers');
+      const list = await r.json();
+      if (!Array.isArray(list)) throw new Error('resposta inválida');
+
+      grid.innerHTML = list.map(c => {
+        if (c.level === 'running') {
+          return `<div class="container-row">
+            <span class="status-dot running"></span>
+            <span class="container-name">${c.name}</span>
+          </div>`;
+        } else if (c.level === 'error') {
+          return `<div class="container-row">
+            <span class="status-warn">⚠</span>
+            <span class="container-name error">${c.name}</span>
+          </div>`;
+        } else {
+          return `<div class="container-row">
+            <span class="status-dot stopped"></span>
+            <span class="container-name stopped">${c.name}</span>
+          </div>`;
+        }
+      }).join('');
+    } catch (e) {
+      grid.innerHTML = `<div class="container-row error-msg">erro ao obter containers</div>`;
+    }
+  }
+
+  // ── Notícias ─────────────────────────────────────────────────────
+  async function fetchNews() {
+    try {
+      const r    = await fetch('/api/news');
+      const data = await r.json();
+      if (!Array.isArray(data) || data.length === 0) throw new Error('sem notícias');
+      newsItems = data;
+      newsIndex = 0;
+      renderNewsItem();
+    } catch (e) {
+      document.getElementById('news-track').innerHTML =
+        '<div class="news-item error-msg">sem notícias disponíveis</div>';
+    }
+  }
+
+  function renderNewsItem() {
+    if (!newsItems.length) return;
+    const item  = newsItems[newsIndex];
+    const num   = newsIndex + 1;
+    const track = document.getElementById('news-track');
+    track.innerHTML = `<div class="news-item">
+      <span class="news-item-num">${num}/${newsItems.length}</span>${item.title}
+    </div>`;
+  }
+
+  function advanceNews() {
+    if (!newsItems.length) return;
+    newsIndex = (newsIndex + 1) % newsItems.length;
+    renderNewsItem();
+  }
+
+  setInterval(advanceNews, NEWS_INTERVAL_MS);
+
+  // ── Galeria ───────────────────────────────────────────────────────
+  async function fetchGallery() {
+    try {
+      const r = await fetch('/api/gallery');
+      galleryUrls = await r.json();
+    } catch (e) {
+      galleryUrls = [];
+    }
+  }
+
+  function showGalleryImage() {
+    if (!galleryUrls.length) return;
+    galleryIndex = (galleryIndex + 1) % galleryUrls.length;
+    const img = document.getElementById('gallery-img');
+    img.src = galleryUrls[galleryIndex];
+  }
+
+  // ── Modo negócio vs galeria ───────────────────────────────────────
+  let galleryTimer = null;
+
+  function applyMode() {
+    const now    = new Date();
+    const active = isBusinessHours(now);
+    const appEl  = document.getElementById('app');
+    const galEl  = document.getElementById('gallery-mode');
+
+    if (active) {
+      appEl.style.display = 'flex';
+      galEl.classList.remove('active');
+      if (galleryTimer) { clearInterval(galleryTimer); galleryTimer = null; }
+    } else {
+      appEl.style.display = 'none';
+      galEl.classList.add('active');
+      if (!galleryTimer) {
+        showGalleryImage();
+        galleryTimer = setInterval(showGalleryImage, GALLERY_INTERVAL_MS);
+      }
+    }
+  }
+
+  // ── Atualização periódica ─────────────────────────────────────────
+  async function refresh() {
+    applyMode();
+    if (!isBusinessHours(new Date())) return;
+    await Promise.allSettled([
+      fetchWeather(),
+      fetchHomeClimate(),
+      fetchContainers(),
+      fetchNews(),
+    ]);
+  }
+
+  // ── Inicialização ─────────────────────────────────────────────────
+  async function init() {
+    await fetchGallery();
+    await refresh();
+    setInterval(refresh, UPDATE_INTERVAL_MS);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

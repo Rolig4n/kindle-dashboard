@@ -1,0 +1,115 @@
+	Prompt inicial
+Voce vai codar pra mim, fazer um guia para do projeto e me auxiliar na implementação.
+
+O projeto é um dashboard simples para meu kindle rodar. a cada 5min as informações são atualizadas, somente durante o periodo comercial (08:00 as 17:00), fora disso mostrar somente uma imagem da galeria informada.
+
+O projeto que voce deve desenvolver, dele levar em conta o tamanho da tela do kindle de 8 geração, o projeto deve rodar em um container docker. O dashboard é para uso na rede interna da residencia, o docker vai rodar no servidor localmente (esse servidor é ubunto server).
+As informações do dashboard são: na parte de cima, divido em 3 blocos, 1º bloco informações do clima local, 2º bloco clima da casa (ah outro docker coletando essas informações, se necessário, darei mais informações depois), 3º horário local; no meio, uma lista dos container e o status do serviço (em dot simples, "rodando", "parado" e se algo aconteceu, uma exclamação); por fim, no rodapé um carrousel de noticias tipo jornal (ainda não esta definido onde essas informações viram).
+
+A documentação do projeto deve ser um markdown simples, passo a passo de tudo que for preciso fazer. Importante saber que, não sei muito sobre como rodar esse dashboard no kindle, ele esta fico o jailbreak e tem o koreader nele.
+Demais duvidas, alem das já esclarecidas no prompt, devem ser esclarecidas antes de criar código para alinhar o resultado esperado.
+
+Confirme se esta de acordo com o escopo.
+
+	Claude AI
+Entendido o escopo! Antes de começar a codar, tenho algumas perguntas importantes para alinhar o resultado.
+
+Perguntas técnicas:
+
+	Respostas
+P: Clima local (bloco 1): qual API você prefere usar?
+R: OpenWeatherMap (gratuita com chave)
+
+P: Notícias no rodapé: qual a fonte preferida?
+R: RSS de portais (G1, UOL, etc.)
+
+P: Containers Docker monitorados: como prefere listar?
+R: Todos os containers do host automaticamente
+
+	Claude AI
+Ótimo! Mais algumas perguntas rápidas para fechar o escopo:
+
+	Respostas
+P: Galeria de imagens (fora do horário comercial): como as imagens serão fornecidas?
+R: URLs externas numa lista
+
+P: Kindle acessa o dashboard como? (importante para saber se precisa de HTTPS ou só HTTP)
+R: Pelo IP local direto (ex: http://192.168.x.x:PORT)
+
+P: Tema visual do dashboard:
+R: Preto e branco (ideal para e-ink do Kindle)
+
+	Claude AI
+Perfeito! Tenho tudo que preciso. Deixa eu confirmar o escopo completo antes de codar:
+
+---
+
+**✅ Escopo confirmado:**
+
+- **Tela:** Kindle 8ª geração (800×600px, e-ink, P&B)
+- **Acesso:** HTTP pelo IP local, porta configurável
+- **Atualização:** a cada 5min, apenas das 08:00 às 17:00
+- **Fora do horário:** slideshow de imagens via URLs externas
+- **Tema:** preto e branco, alto contraste
+
+**Blocos do dashboard:**
+1. Clima local → OpenWeatherMap (com chave de API)
+2. Clima da casa → Docker separado (endpoint a definir depois)
+3. Horário local
+4. Lista de containers Docker com status (● rodando / ● parado / ⚠ erro)
+5. Rodapé com carrossel de notícias via RSS (G1, UOL, configurável)
+
+**Infra:**
+- Docker rodando em Ubuntu Server
+- Socket do Docker montado no container (`/var/run/docker.sock`)
+- Imagens da galeria via lista de URLs no `.env`
+
+---
+
+Agora vou criar tudo: o código, a estrutura do projeto e a documentação. Um momento.
+
+Bom. Agora vou construir tudo. Vou criar a estrutura completa do projeto.
+
+Agora a documentação completa:
+
+Tudo funcionando. Agora vou empacotar e apresentar os arquivos:
+
+Projeto completo entregue. Aqui está o resumo do que foi criado:
+
+---
+
+**Estrutura do projeto (`kindle-dashboard.zip`):**
+
+```
+kindle-dashboard/
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example          ← copie para .env e preencha
+├── backend/
+│   ├── server.js         ← Express: 5 endpoints de API
+│   └── package.json
+├── frontend/
+│   └── public/
+│       └── index.html    ← dashboard completo em HTML puro
+└── docs/
+    └── GUIA.md           ← passo a passo completo
+```
+
+**Para colocar no ar, são basicamente 4 comandos no servidor:**
+
+```bash
+cp .env.example .env
+nano .env              # preenche OWM_API_KEY e OWM_CITY
+docker compose up -d --build
+# acessa http://IP_DO_SERVIDOR:3000 no Kindle
+```
+
+---
+
+**Pontos que ficaram configuráveis para você ajustar depois:**
+
+- **`HOME_CLIMATE_URL`** — assim que você tiver o container de sensores da casa pronto, é só colocar a URL no `.env` e reiniciar. O guia mostra o formato JSON esperado.
+- **Galeria de imagens** — coloque as URLs no `GALLERY_URLS` separadas por vírgula.
+- **Feeds RSS** — está com G1 e UOL por padrão, mas o guia lista outras opções brasileiras.
+
+O guia (`GUIA.md`) cobre toda a parte do Kindle com KOReader, incluindo como abrir o navegador, definir a página inicial e manter a tela sempre ligada.
