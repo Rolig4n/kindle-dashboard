@@ -56,7 +56,7 @@
     }
 
     .block-label {
-      font-size: 9px;
+      font-size: 12px;
       letter-spacing: 0.08em;
       text-transform: lowercase;
       color: var(--muted);
@@ -90,13 +90,14 @@
     /* Bloco 3 – Horário */
     #clock-time {
       font-family: var(--font-data);
-      font-size: 46px;
+      font-size: 14px;
       line-height: 1;
       font-weight: normal;
-      letter-spacing: -1px;
+      letter-spacing: 1px;
+      margin-right: 5px;
     }
-    #clock-date { font-size: 11px; color: var(--muted); margin-top: 4px; }
-    #clock-week { font-size: 10px; color: var(--muted); }
+    #clock-date { font-size: 14px; color: var(--muted); margin-top: 4px; margin-right: 5px; }
+    #clock-week { font-size: 14px; color: var(--muted); }
 
     /* ── Meio: containers ────────────────────────────────────────── */
     #middle {
@@ -107,7 +108,7 @@
     }
 
     #middle-label {
-      font-size: 9px;
+      font-size: 12px;
       letter-spacing: 0.08em;
       color: var(--muted);
       border-bottom: 1px solid var(--border);
@@ -117,8 +118,8 @@
 
     #container-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 4px 10px;
+      grid-template-columns: 1fr;
+      gap: 4px;
     }
 
     .container-row {
@@ -163,7 +164,7 @@
     }
 
     #news-label {
-      font-size: 9px;
+      font-size: 12px;
       color: var(--muted);
       white-space: nowrap;
       margin-right: 10px;
@@ -179,19 +180,18 @@
 
     #news-track {
       display: flex;
-      gap: 0;
-      transition: transform 0.6s ease;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .news-item {
-      min-width: 100%;
       font-size: 12px;
       line-height: 1.35;
       color: var(--fg);
     }
 
     .news-item-num {
-      font-size: 9px;
+      font-size: 12px;
       color: var(--muted);
       margin-right: 5px;
     }
@@ -259,34 +259,32 @@
       </div>
     </div>
 
-    <!-- Bloco 3: Horário -->
+    <!-- Bloco 3: Containers -->
     <div class="top-block">
-      <div class="block-label">horário</div>
-      <div>
-        <div id="clock-time">--:--</div>
-        <div id="clock-date"></div>
-        <div id="clock-week"></div>
+      <div class="block-label">containers</div>
+      <div id="container-grid">
+        <div class="container-row"><span class="loading">carregando...</span></div>
       </div>
     </div>
 
   </div><!-- /top -->
 
-  <!-- MEIO: Containers -->
+  <!-- MEIO: Notícias -->
   <div id="middle">
-    <div id="middle-label">containers docker</div>
-    <div id="container-grid">
-      <div class="container-row"><span class="loading">carregando...</span></div>
-    </div>
-  </div>
-
-  <!-- RODAPÉ: Notícias -->
-  <div id="footer">
+    <div id="middle-label">Atualizações</div>
     <div id="news-label">notícias</div>
     <div id="news-ticker">
       <div id="news-track">
-        <div class="news-item loading">carregando...</div>
+        <p class="news-item loading">carregando...</p>
       </div>
     </div>
+  </div>
+
+  <!-- RODAPÉ: Horário -->
+  <div id="footer">
+    <div id="clock-time">--:--</div>
+    <div id="clock-date"></div>
+    <div id="clock-week"></div>
   </div>
 
 </div><!-- /app -->
@@ -304,7 +302,6 @@
   // ── Configurações ────────────────────────────────────────────────
   const UPDATE_INTERVAL_MS = 5 * 60 * 1000;   // 5 minutos
   const CLOCK_INTERVAL_MS  = 1000;
-  const NEWS_INTERVAL_MS   = 8000;             // troca de notícia a cada 8s
   const GALLERY_INTERVAL_MS = 30000;           // troca de imagem a cada 30s
   const BUSINESS_START     = 8;
   const BUSINESS_END       = 17;
@@ -314,7 +311,6 @@
 
   // ── Estado ───────────────────────────────────────────────────────
   let newsItems    = [];
-  let newsIndex    = 0;
   let galleryUrls  = [];
   let galleryIndex = 0;
 
@@ -430,31 +426,20 @@
       const data = await r.json();
       if (!Array.isArray(data) || data.length === 0) throw new Error('sem notícias');
       newsItems = data;
-      newsIndex = 0;
       renderNewsItem();
     } catch (e) {
       document.getElementById('news-track').innerHTML =
-        '<div class="news-item error-msg">sem notícias disponíveis</div>';
+        '<p class="news-item error-msg">sem notícias disponíveis</p>';
     }
   }
 
   function renderNewsItem() {
     if (!newsItems.length) return;
-    const item  = newsItems[newsIndex];
-    const num   = newsIndex + 1;
     const track = document.getElementById('news-track');
-    track.innerHTML = `<div class="news-item">
-      <span class="news-item-num">${num}/${newsItems.length}</span>${item.title}
-    </div>`;
+    track.innerHTML = newsItems.map((item, i) =>
+      `<p class="news-item"><span class="status-dot running"></span> ${item.title}</p>`
+    ).join('');
   }
-
-  function advanceNews() {
-    if (!newsItems.length) return;
-    newsIndex = (newsIndex + 1) % newsItems.length;
-    renderNewsItem();
-  }
-
-  setInterval(advanceNews, NEWS_INTERVAL_MS);
 
   // ── Galeria ───────────────────────────────────────────────────────
   async function fetchGallery() {
