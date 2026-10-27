@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   kindle-dashboard:
     build: .
@@ -17,7 +15,7 @@ services:
 
       # ── OpenWeatherMap ────────────────────────────────────────────
       OWM_API_KEY: ${OWM_API_KEY}
-      OWM_CITY:    ${OWM_CITY:-"Sao Paulo,BR"}
+      OWM_CITY:    ${OWM_CITY:-"Indiaporã,BR"}
       OWM_UNITS:   ${OWM_UNITS:-metric}
 
       # ── Clima interno (container separado) ────────────────────────
@@ -25,7 +23,7 @@ services:
       HOME_CLIMATE_URL: ${HOME_CLIMATE_URL:-""}
 
       # ── RSS de notícias (separar múltiplos feeds com vírgula) ──────
-      RSS_FEEDS:     ${RSS_FEEDS:-"https://g1.globo.com/rss/g1/,https://feeds.feedburner.com/uolnoticias"}
+      RSS_FEEDS:     ${RSS_FEEDS:-"https://g1.globo.com/rss/g1/"}
       RSS_MAX_ITEMS: ${RSS_MAX_ITEMS:-20}
 
       # ── Galeria de imagens (URLs separadas por vírgula) ────────────

@@ -5,14 +5,22 @@ const Docker = require('dockerode');
 const path = require('path');
 
 const app = express();
-const parser = new RSS Parser();
+const parser = new Parser();
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 
-app.use(express.static(path.join(__dirname, '../frontend/public')));
+// FRONTEND_PATH pode ser sobrescrito via env; padrão cobre tanto o container
+// (/app/frontend/public) quanto execução local a partir de backend/ (../frontend/public)
+const fs = require('fs');
+const containerPath = path.join(__dirname, 'frontend', 'public');
+const localDevPath  = path.join(__dirname, '..', 'frontend', 'public');
+const staticPath    = process.env.FRONTEND_PATH ||
+                      (fs.existsSync(containerPath) ? containerPath : localDevPath);
+app.use(express.static(staticPath));
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   next();
 });
+
 
 // ── Clima externo ─────────────────────────────────────────────────────────────
 app.get('/api/weather', async (req, res) => {

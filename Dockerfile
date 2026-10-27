@@ -12,7 +12,7 @@ RUN npm install --omit=dev
 
 # Copia código
 COPY backend/server.js ./
-COPY frontend/ ./frontend/
+COPY frontend/public/ ./frontend/public/
 
 # Porta padrão
 EXPOSE 3000
