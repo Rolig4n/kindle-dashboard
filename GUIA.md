@@ -1,6 +1,6 @@
 # Kindle Dashboard — Guia de Implementação
 
-Dashboard local para Kindle 8ª geração (e-ink, 800×600 px), rodando como container Docker em Ubuntu Server. Atualiza a cada 5 minutos durante o horário comercial (08h–17h); fora desse período exibe um slideshow de imagens.
+Dashboard local para Kindle 8ª geração (e-ink, 800×600 px), rodando como container Docker em Ubuntu Server. Atualiza a cada 5 minutos durante o horário (08h–22h); fora desse período exibe um slideshow de imagens.
 
 ---
 
@@ -8,36 +8,40 @@ Dashboard local para Kindle 8ª geração (e-ink, 800×600 px), rodando como con
 
 1. [Visão geral da arquitetura](#1-visão-geral-da-arquitetura)
 2. [Pré-requisitos no servidor](#2-pré-requisitos-no-servidor)
-3. [Obtendo a chave da OpenWeatherMap](#3-obtendo-a-chave-da-openweathermap)
-4. [Clonando e configurando o projeto](#4-clonando-e-configurando-o-projeto)
-5. [Subindo o container Docker](#5-subindo-o-container-docker)
-6. [Configurando o Kindle (KOReader)](#6-configurando-o-kindle-koreader)
-7. [Variáveis de ambiente — referência completa](#7-variáveis-de-ambiente--referência-completa)
-8. [Integrando o clima da casa](#8-integrando-o-clima-da-casa)
-9. [Personalização de feeds RSS](#9-personalização-de-feeds-rss)
-10. [Galeria de imagens](#10-galeria-de-imagens)
-11. [Manutenção e comandos úteis](#11-manutenção-e-comandos-úteis)
-12. [Solução de problemas](#12-solução-de-problemas)
+3. [Transferindo os arquivos do Windows para o servidor](#3-transferindo-os-arquivos-do-windows-para-o-servidor)
+4. [Obtendo a chave da OpenWeatherMap](#4-obtendo-a-chave-da-openweathermap)
+5. [Configurando o projeto no servidor](#5-configurando-o-projeto-no-servidor)
+6. [Subindo o container Docker](#6-subindo-o-container-docker)
+7. [Configurando o Kindle (KOReader)](#7-configurando-o-kindle-koreader)
+8. [Variáveis de ambiente — referência completa](#8-variáveis-de-ambiente--referência-completa)
+9. [Integrando o clima da casa](#9-integrando-o-clima-da-casa)
+10. [Personalização de feeds RSS](#10-personalização-de-feeds-rss)
+11. [Galeria de imagens](#11-galeria-de-imagens)
+12. [Manutenção e comandos úteis](#12-manutenção-e-comandos-úteis)
+13. [Solução de problemas](#13-solução-de-problemas)
 
 ---
 
 ## 1. Visão geral da arquitetura
 
 ```
-Kindle (KOReader / navegador interno)
-        │  HTTP  (rede Wi-Fi local)
+Kindle (roda dashboard.sh via cron do KOReader)
+        │  wget PNG  (rede Wi-Fi local)
         ▼
 Ubuntu Server — porta 3000
         │
   [Docker: kindle-dashboard]
+        ├── GET /screenshot         → Puppeteer tira print do dashboard (PNG 800×600)
         ├── GET /api/weather        → OpenWeatherMap API
         ├── GET /api/home-climate   → container de sensores (opcional)
         ├── GET /api/containers     → /var/run/docker.sock (host)
         ├── GET /api/news           → feeds RSS (G1, UOL…)
         └── GET /api/gallery        → lista de URLs de imagens (.env)
+
+Kindle exibe o PNG com eips (framebuffer nativo do e-ink, sem abrir app)
 ```
 
-O container **não precisa de banco de dados**. Todo o estado é efêmero; o frontend em HTML puro faz as requisições diretamente para o backend a cada 5 minutos.
+O container gera o dashboard em HTML internamente, tira um screenshot com Puppeteer/Chromium e entrega um PNG pronto. O Kindle só precisa baixar e exibir — sem navegador, sem JavaScript rodando no dispositivo.
 
 ---
 
@@ -147,51 +151,118 @@ http://192.168.1.100:3000
 
 ---
 
-## 6. Configurando o Kindle (KOReader)
+## 6. Configurando o Kindle
 
-O Kindle precisa estar **com jailbreak** e com o **KOReader instalado** (o que você já tem).
+O Kindle exibe o dashboard como um **PNG estático** gerado pelo servidor. O script `dashboard.sh` roda no Kindle a cada 5 minutos, baixa o PNG e exibe com `eips` — a ferramenta nativa que escreve direto no framebuffer do e-ink, sem abrir nenhum app.
 
-### 6.1 Conectar o Kindle ao Wi-Fi da casa
+### 6.1 Pré-requisitos no Kindle
 
-No Kindle:
-- Menu → **Configurações** → **Wi-Fi** → conecte à sua rede doméstica
+- Jailbreak instalado
+- KOReader instalado
+- Kindle conectado ao Wi-Fi da mesma rede do servidor
+- SSH habilitado (veja como ativar abaixo)
 
-### 6.2 Abrir o navegador do KOReader
+### 6.2 Ativar SSH no Kindle via KOReader
 
-O KOReader tem um navegador embutido. Para acessá-lo:
+O SSH no KOReader precisa ser iniciado manualmente antes de cada sessão:
 
 1. Abra o KOReader
-2. Menu superior → ícone de engrenagem (Ferramentas) → **Navegador**
-   - Em algumas versões: Menu → **More tools** → **Web browser**
-3. Na barra de endereço, digite:
+2. Menu (ícone de engrenagem) → **SSH Server** → **Start**
+3. Anote o IP exibido na tela (ex: `192.168.1.50`)
+4. A porta padrão é `22`, senha padrão é `mario`
+
+> Para que o SSH suba automaticamente ao ligar o Kindle, vá em KOReader → SSH Server → **Start on boot**.
+
+### 6.3 Conectar via SSH pelo PC
+
+No PowerShell (Windows) ou terminal (Linux/Mac):
+
+```bash
+ssh root@IP_DO_KINDLE
+# senha: mario
+```
+
+Se conectar, o terminal do Kindle abre. Pode prosseguir.
+
+### 6.4 Transferir o script para o Kindle
+
+O arquivo `kindle/dashboard.sh` está na pasta do projeto. Antes de enviar, edite o IP do servidor:
+
+**No Windows (PowerShell):**
+```powershell
+# Edite o IP na linha SERVER_IP do arquivo dashboard.sh
+notepad kindle\dashboard.sh
+```
+
+Altere esta linha:
+```sh
+SERVER_IP="192.168.1.100"   # << coloque o IP do seu Ubuntu Server
+```
+
+Depois envie via SCP:
+
+```powershell
+# Windows
+scp kindle\dashboard.sh root@IP_DO_KINDLE:/mnt/us/dashboard/dashboard.sh
+```
+
+```bash
+# Linux/Mac
+scp kindle/dashboard.sh root@IP_DO_KINDLE:/mnt/us/dashboard/dashboard.sh
+```
+
+### 6.5 Dar permissão de execução ao script
+
+No SSH do Kindle:
+
+```sh
+chmod +x /mnt/us/dashboard/dashboard.sh
+
+# Teste manual — deve baixar o PNG e exibir na tela:
+/mnt/us/dashboard/dashboard.sh
+```
+
+Se a tela mostrar o dashboard, está funcionando.
+
+### 6.6 Configurar o cron no KOReader
+
+O KOReader tem um agendador de tarefas embutido. Para configurar:
+
+1. No KOReader: Menu → **Configurações** → **Device settings** → **Autostart**
+   - Ou: Menu → **Tools** → **More tools** → **Scheduler** (depende da versão)
+2. Adicione uma tarefa com o comando:
    ```
-   http://192.168.1.100:3000
+   /mnt/us/dashboard/dashboard.sh
    ```
-   (substitua pelo IP do seu servidor)
+3. Defina o intervalo: **5 minutos**
 
-### 6.3 Fazer o Kindle abrir o dashboard automaticamente
+**Alternativa — cron nativo do Kindle:**
 
-Para que o dashboard abra sozinho quando o Kindle ligar (modo quiosque), você pode usar o plugin **KOReader Screensaver** ou configurar o navegador como página inicial:
+No SSH do Kindle, edite o crontab:
 
-1. No KOReader, vá em: Menu → **Configurações do navegador**
-2. Defina a **Home page** / **Página inicial** como `http://192.168.1.100:3000`
+```sh
+# Verificar se o cron está disponível
+which crontab || which crond
 
-### 6.4 Manter a tela sempre ligada
+# Editar
+crontab -e
+```
 
-No Kindle:
-- Menu → **Configurações** → **Exibição** → **Tempo limite da tela** → Defina para **Nunca** ou o maior valor disponível
+Adicione a linha:
+
+```cron
+*/5 * * * * /mnt/us/dashboard/dashboard.sh >> /mnt/us/dashboard/cron.log 2>&1
+```
+
+Salve e saia (`Ctrl+O`, `Enter`, `Ctrl+X` se for nano).
+
+### 6.7 Manter a tela do Kindle sempre ligada
+
+No Kindle (menu nativo):
+- Configurações → **Exibição** → **Tempo limite da tela** → **Nunca**
 
 No KOReader:
-- Menu → **Energia** → desative o sleep automático enquanto o navegador estiver aberto
-
-### 6.5 Modo tela cheia no KOReader
-
-Para esconder as barras do navegador e usar os 800×600 px inteiros:
-
-- Toque na barra de endereço → ícone de tela cheia (⛶), ou
-- Menu → **Fullscreen** / **Tela cheia**
-
-> **Dica:** O dashboard foi desenhado exatamente para 800×600 px (resolução do Kindle Paperwhite 8ª gen). Não é necessário zoom.
+- Menu → **Energia** → desabilite o sleep automático
 
 ---
 
@@ -305,32 +376,86 @@ docker compose up -d --build
 
 ---
 
-## 12. Solução de problemas
+## 12. Manutenção e comandos úteis
+
+```bash
+# Ver status dos containers
+docker compose ps
+
+# Ver logs do dashboard
+docker compose logs -f kindle-dashboard
+
+# Reiniciar após alterar o .env
+docker compose restart kindle-dashboard
+
+# Rebuild após alterar código
+docker compose up -d --build
+
+# Parar tudo
+docker compose down
+
+# Ver uso de recursos
+docker stats kindle-dashboard
+
+# Testar geração do PNG manualmente
+curl -o teste.png http://localhost:3000/screenshot
+# Forçar novo screenshot (ignora cache)
+curl -o teste.png "http://localhost:3000/screenshot?force=1"
+```
+
+---
+
+## 13. Solução de problemas
+
+### `/screenshot` retorna erro 500
+- O Chromium pode não estar instalado corretamente na imagem
+- Faça rebuild: `docker compose up -d --build`
+- Veja os logs: `docker compose logs -f kindle-dashboard`
+- Confirme que `CHROMIUM_PATH=/usr/bin/chromium-browser` está correto dentro do container:
+  ```bash
+  docker exec kindle-dashboard which chromium-browser
+  ```
+
+### `eips: command not found` no Kindle
+- O `eips` é nativo de todo Kindle com jailbreak. Se não estiver disponível, verifique se o jailbreak foi aplicado corretamente
+- Caminho alternativo: `/usr/sbin/eips`
+  ```sh
+  # Edite o dashboard.sh e substitua eips por:
+  /usr/sbin/eips
+  ```
+
+### SSH recusado no Kindle
+- O servidor SSH precisa ser iniciado manualmente no KOReader antes de cada sessão
+- KOReader → SSH Server → **Start**
+- Para subir automaticamente: KOReader → SSH Server → **Start on boot**
+
+### wget falha no Kindle
+- Confirme que o Kindle e o servidor estão na mesma rede Wi-Fi
+- Teste no SSH do Kindle:
+  ```sh
+  wget -O /tmp/test.png http://IP_DO_SERVIDOR:3000/screenshot
+  ```
+- Verifique o firewall do servidor: `sudo ufw allow 3000`
 
 ### "Erro ao obter clima externo"
 - Verifique se `OWM_API_KEY` está correto no `.env`
 - Chaves novas da OpenWeatherMap levam até 10 min para ativar
-- Teste: `curl "https://api.openweathermap.org/data/2.5/weather?q=SaoPaulo,BR&appid=SUA_CHAVE&units=metric"`
+- Teste direto: `curl "https://api.openweathermap.org/data/2.5/weather?q=SaoPaulo,BR&appid=SUA_CHAVE&units=metric"`
 
 ### "Erro ao listar containers"
 - O socket do Docker deve estar montado corretamente
-- Verifique: `docker compose ps` e confirme que o volume `/var/run/docker.sock` está mapeado
-- O usuário que roda o Docker deve ter permissão no socket
+- Verifique: `docker compose ps` e confirme o volume `/var/run/docker.sock`
 
-### Kindle não acessa o dashboard
-- Confirme que o Kindle e o servidor estão na mesma rede Wi-Fi
-- Confirme o IP do servidor: `ip addr show`
-- Teste no navegador do seu celular antes de tentar no Kindle
-- Verifique o firewall do servidor: `sudo ufw status`
-  - Se necessário: `sudo ufw allow 3000`
+### Imagens da galeria não aparecem no PNG
+- Confirme que as URLs estão acessíveis a partir do servidor (não só do seu PC)
+- Teste: `curl -I URL_DA_IMAGEM` no servidor
+- Algumas URLs têm proteção contra hotlinking — hospede as imagens localmente se necessário
 
-### Dashboard aparece com zoom incorreto no Kindle
-- O KOReader pode aplicar zoom automático. Procure a opção "Zoom" no menu do navegador e defina como **100%** ou **Fit width**
-- O `<meta name="viewport" content="width=800">` garante que o layout use exatamente 800 px
-
-### Imagens da galeria não aparecem
-- Confirme que as URLs estão acessíveis (abra no navegador do celular)
-- Algumas URLs podem ter proteção contra hotlinking — nesse caso, hospede as imagens você mesmo
+### Ver o log do script no Kindle
+```sh
+# No SSH do Kindle:
+cat /mnt/us/dashboard/dashboard.log
+```
 
 ---
 

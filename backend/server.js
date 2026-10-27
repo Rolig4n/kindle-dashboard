@@ -21,7 +21,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 // ── Clima externo ─────────────────────────────────────────────────────────────
 app.get('/api/weather', async (req, res) => {
   try {
@@ -103,6 +102,67 @@ app.get('/api/gallery', (req, res) => {
   const raw = process.env.GALLERY_URLS || '';
   const urls = raw.split(',').map(u => u.trim()).filter(Boolean);
   res.json(urls);
+});
+
+// ── Screenshot PNG para o Kindle ──────────────────────────────────────────────
+// GET /screenshot  →  retorna PNG 800×600 do dashboard em P&B
+// O Kindle baixa esse PNG via wget e exibe com eips (framebuffer nativo)
+let screenshotCache = null;
+let screenshotTs    = 0;
+const SCREENSHOT_TTL_MS = 4 * 60 * 1000; // cache de 4 min (atualiza antes dos 5 min do Kindle)
+
+app.get('/screenshot', async (req, res) => {
+  const now = Date.now();
+  const force = req.query.force === '1';
+
+  // Serve cache se ainda válido e não forçado
+  if (!force && screenshotCache && (now - screenshotTs) < SCREENSHOT_TTL_MS) {
+    res.set('Content-Type', 'image/png');
+    res.set('X-Cache', 'HIT');
+    return res.send(screenshotCache);
+  }
+
+  let browser;
+  try {
+    const puppeteer = require('puppeteer');
+    browser = await puppeteer.launch({
+      executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--headless',
+      ],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 800, height: 600, deviceScaleFactor: 1 });
+
+    // Aponta para o próprio servidor (localhost dentro do container)
+    const port = process.env.PORT || 3000;
+    await page.goto(`http://localhost:${port}`, { waitUntil: 'networkidle0', timeout: 20000 });
+
+    // Aguarda o relógio renderizar (garante que JS terminou)
+    await page.waitForSelector('#clock-time', { timeout: 5000 });
+
+    const png = await page.screenshot({
+      type: 'png',
+      clip: { x: 0, y: 0, width: 800, height: 600 },
+    });
+
+    screenshotCache = png;
+    screenshotTs    = Date.now();
+
+    res.set('Content-Type', 'image/png');
+    res.set('X-Cache', 'MISS');
+    res.send(png);
+  } catch (e) {
+    console.error('[screenshot]', e.message);
+    res.status(500).json({ error: 'Falha ao gerar screenshot', detail: e.message });
+  } finally {
+    if (browser) await browser.close();
+  }
 });
 
 // ── Healthcheck ───────────────────────────────────────────────────────────────
